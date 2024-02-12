@@ -6,6 +6,11 @@ import tiledb
 import anndata
 from scipy.stats import ttest_ind
 import numpy as np
+# These are used to be able to use limma package in python
+import rpy2.robjects.packages as rpackages
+from rpy2.robjects.vectors import StrVector
+# This is how is imported
+limma = rpackages.importr('limma')
 
 
 # interactive node
