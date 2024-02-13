@@ -13,8 +13,9 @@ from rpy2.robjects.vectors import StrVector
 limma = rpackages.importr('limma')
 
 
-# interactive node
-#srun -n 4 --time=100:00:00 --pty bash -i
+# Interactive node
+# CPU: srun -n 4 --time=100:00:00 --pty bash -i
+# BIGMEM: srun -p bigmem -n 4 --time=100:00:00 --pty bash -i
 
 #my directory
 cd active/debruinz_project/gautam_subedi
