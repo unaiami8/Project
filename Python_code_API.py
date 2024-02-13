@@ -153,12 +153,12 @@ dense_array_covid = covid_exp_mat.toarray()
 dense_array_normal = normal_exp_mat.toarray()
 
 # Perform t-test
->>> t_statistic, p_value = ttest_ind(dense_array_covid, dense_array_normal)
+t_statistic, p_value = ttest_ind(dense_array_covid, dense_array_normal)
 
 # saving test statistics
-output_filename = "/active/debruinz_project/gautam_subedi/significant_gene_t_test_results.csv"
-np.savetxt(output_filename, np.column_stack((significant_gene_names, significant_t_statistics, significant_p_values)),
-           delimiter=',', header="Gene Name, t-statistic, p-value", comments='')
+output_filename = "/active/debruinz_project/unai_amilleta/significant_gene_t_test_results.csv"
+np.savetxt(output_filename, np.column_stack((t_statistic, p_value)),
+           delimiter=',', header="t-statistic, p-value", comments='')
 
 
 
