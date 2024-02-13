@@ -155,6 +155,13 @@ dense_array_normal = normal_exp_mat.toarray()
 # Perform t-test
 t_statistic, p_value = ttest_ind(dense_array_covid, dense_array_normal)
 
+# Create a DataFrame to store gene names and p-values
+result_df = pd.DataFrame({'Gene': gene_names, 'P-value': p_values})
+
+# Print the genes with significant p-values
+significant_genes = result_df[result_df['P-value'] < 0.05]
+print(significant_genes)
+
 # saving test statistics
 output_filename = "/active/debruinz_project/unai_amilleta/significant_gene_t_test_results.csv"
 np.savetxt(output_filename, np.column_stack((t_statistic, p_value)),
