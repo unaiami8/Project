@@ -162,8 +162,15 @@ result_df = pd.DataFrame({'Gene': gene_names, 'P-value': p_values})
 significant_genes = result_df[result_df['P-value'] < 0.05]
 print(significant_genes)
 
+result_p_values_df = pd.DataFrame({
+    'Gene': gene_names,
+    'Gene_ID': gene_id,
+    'T-statistic': values['t-statistic'],  # assuming 'values' is a DataFrame containing t-statistics and p-values
+    'P-value': values[' p-value']           # assuming 'values' is a DataFrame containing t-statistics and p-values
+})
+
 # saving test statistics
-output_filename = "/active/debruinz_project/unai_amilleta/significant_gene_t_test_results.csv"
+output_filename = "/active/debruinz_project/unai_amilleta/result_p_values.csv"
 np.savetxt(output_filename, np.column_stack((t_statistic, p_value)),
            delimiter=',', header="t-statistic, p-value", comments='')
 
