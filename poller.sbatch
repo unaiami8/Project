@@ -12,4 +12,4 @@
 
 # Here we choose which Python script we submit to the cpu cluster for 
 # checking an API
-/usr/bin/python3 /home/username/poller.py
+# /usr/bin/python3 /home/username/poller.py
