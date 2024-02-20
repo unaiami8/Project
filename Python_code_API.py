@@ -6,13 +6,19 @@ import tiledb
 import anndata
 from scipy.stats import ttest_ind
 import numpy as np
+import rpy2.robjects as robjects
+from rpy2.robjects import pandas2ri
+from rpy2.robjects.packages import importr
+import anndata2ri
+# Import required R packages
+limma = importr('limma')
 
 # interactive node
 #srun -n 4 --time=100:00:00 --pty bash -i
 #BIGMEM: srun -p bigmem -n 4 --time=100:00:00 --pty bash -i
 
-#my directory
-cd active/debruinz_project/gautam_subedi
+# my directory
+# cd active/debruinz_project/gautam_subedi
 
 #opening soma
 census = cellxgene_census.open_soma()
@@ -49,7 +55,7 @@ normal_adata = anndata.read_h5ad("/active/debruinz_project/gautam_subedi/adata_n
 covid_exp_mat = covid_adata.X
 normal_exp_mat = normal_adata.X
 
-#cehcking gene_names and cell_type of covid_data
+#checking gene_names and cell_type of covid_data
 covid_adata.var.feature_name
 covid_adata.obs.cell_type
 
@@ -93,6 +99,48 @@ significant_gene_names =significant_gene_names.astype(str) #Not necessary if sav
 output_filename = "/active/debruinz_project/gautam_subedi/t_test_results.csv"
 df = pd.DataFrame(data)
 df.to_csv(output_filename, index=False)
+
+
+# Convert pandas dataframes to R dataframes
+pandas2ri.activate()
+
+def limma_t_test(covid_exp_mat, normal_exp_mat):
+    # Convert Python pandas dataframes to R dataframes
+    covid_exp_mat_r = pandas2ri.py2ri(covid_exp_mat)
+    normal_exp_mat_r = pandas2ri.py2ri(normal_exp_mat)
+
+    # Run limma t-test
+    design_matrix = robjects.r.cbind(robjects.IntVector([1]*covid_exp_mat_r.ncol), robjects.IntVector([0]*normal_exp_mat_r.ncol))
+    fit = limma.lmFit(covid_exp_mat_r, design_matrix)
+    contrast_matrix = robjects.r.matrix(robjects.FloatVector([1, -1]), nrow=1)
+    contrast = robjects.r.contrasts.fit(fit, contrast_matrix)
+    fit_eb = limma.eBayes(contrast)
+    top_table = limma.topTable(fit_eb, coef=1, number=covid_exp_mat_r.nrow)
+    
+    # Extract results
+    results = pandas2ri.ri2py_dataframe(top_table)
+    
+    return results
+
+# Example usage:
+# Assuming you have two pandas DataFrames: covid_exp_mat and normal_exp_mat
+# results = limma_t_test(covid_exp_mat, normal_exp_mat)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #another approach, This can be revised to use for sparse matrix
