@@ -6,12 +6,16 @@ import tiledb
 import anndata
 from scipy.stats import ttest_ind
 import numpy as np
+import rpy2.robjects as ro
 import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
 import anndata2ri
-# Import required R packages
+#Import R libraries
+base = importr('base')
+stats = importr('stats')
 limma = importr('limma')
+writexl = importr('writexl')
 
 # interactive node
 #srun -n 4 --time=100:00:00 --pty bash -i
@@ -59,7 +63,7 @@ normal_exp_mat = normal_adata.X
 covid_adata.var.feature_name
 covid_adata.obs.cell_type
 
-#cehcking gene_names and cell_type of normal_data and covid and non-covid have same feature length and ids
+#checking gene_names and cell_type of normal_data and covid and non-covid have same feature length and ids
 normal_adata.var.feature_name
 normal_adata.obs.cell_type
 
@@ -72,13 +76,13 @@ adata_normal.obs['cell_type'].unique() #184 catrgoreis
 
 # This section shows common expression matrix containing genes and cells that are present in both.
 
-# Common cell_type
+# CELL METADATA: Common cell_type
 unique_cell_types_covid = set(adata_covid.obs['cell_type'].unique())
 unique_cell_types_normal = set(adata_normal.obs['cell_type'].unique())
 common_cell_types = unique_cell_types_covid.intersection(unique_cell_types_normal)
 #print(common_cell_types)  = 66 common cell types
 
-# Output shows that they have same gene name and also at same position with same dimension
+# GENE METADATA: Output shows that they have same gene name and also at same position with same dimension
 covid_feature_names = set(covid_adata.var['feature_name'])
 normal_feature_names = set(normal_adata.var['feature_name'])
 common_feature_names = covid_feature_names.intersection(normal_feature_names)
@@ -126,52 +130,24 @@ def limma_t_test(covid_exp_mat, normal_exp_mat):
 # Assuming you have two pandas DataFrames: covid_exp_mat and normal_exp_mat
 # results = limma_t_test(covid_exp_mat, normal_exp_mat)
 
+## We can't convert the sparse matrices into R matrces for further analysis. WHen trying to make it 
+## densa matrix and then to a exp_mat in R it doesnt load. 
 
 
+## WHY DOESN'T THIS WORK ##
+# Convert CSR matrices to dense arrays
+covid_data_dense = covid_exp_mat.toarray()
+non_covid_data_dense = normal_exp_mat.toarray()
 
+# Transfer data to R
+ro.numpy2ri.activate()  # Activate conversion between NumPy arrays and R arrays
+r_covid_data = ro.r.matrix(covid_data_dense)
+r_non_covid_data = ro.r.matrix(non_covid_data_dense)
 
+# Load limma library in R
+ro.r("library(limma)")
 
+# Perform t-test using limma
+ro.r("result <- eBayes(lmFit(cbind(covid_data, non_covid_data) ~ condition))")
 
-
-
-
-
-
-
-
-
-
-
-
-#another approach, This can be revised to use for sparse matrix
-#gene_names = covid_adata.var.feature_name
-#num_genes = covid_exp_mat.shape[1]
-#gene_indices = np.arange(0, num_genes)
-#t_statistics = np.zeros(num_genes)
-#p_values = np.zeros(num_genes)
-#significant_gene_names = []
-#significant_t_statistics = []
-#significant_p_values = []
-#for gene_index in range(num_genes):
-#    covid_gene_data = covid_exp_mat[:, gene_index].data
-#    normal_gene_data = normal_exp_mat[:, gene_index].data
-#    if len(covid_gene_data) >= 2 and len(normal_gene_data) >= 2:
-#        t_statistic, p_value = ttest_ind(covid_gene_data, normal_gene_data, equal_var=False)
-#        t_statistics[gene_index] = t_statistic
-#        p_values[gene_index] = p_value
-#        if p_value < 0.05:
-#            significant_gene_names.append(gene_names.values[gene_index])
-#            significant_t_statistics.append(t_statistic)
-#            significant_p_values.append(p_value)
-#    else:
-#        t_statistics[gene_index] = np.nan
-#        p_values[gene_index] = np.nan
-
-
-#>>> significant_gene_ids = gene_ids[significant_genes_value]
-#>>> data1 = {'Gene_Ids' : significant_gene_ids, 'Gene_names': significant_gene_names, 'p-value': significant_p_values}
-#>>> df = pd.DataFrame(data1)
-
-
-
-
+sc.tl.rank_genes_groups(combined_adata, groups=['covid_exp_mat', 'normal_exp_mat'], method='ttest')  # Replace 'ttest' with desired test
