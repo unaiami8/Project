@@ -4,13 +4,11 @@ import scanpy as sc
 import math
 import tiledb
 import anndata
-from scipy.stats import ttest_ind
-import numpy as np
-import rpy2.robjects as ro
-import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
 import anndata2ri
+import rpy2.robjects as ro
+
 #Import R libraries
 base = importr('base')
 stats = importr('stats')
@@ -89,65 +87,45 @@ common_feature_names = covid_feature_names.intersection(normal_feature_names)
 #len(common_feature_names)
 #60664
 
+# Define the number of cells or genes you want to subsample
+num_cells = 20000
 
-#LIMMA, ANOVA
-gene_names = covid_adata.var.feature_name
-covid_gene_data = covid_exp_mat.toarray()
-normal_gene_data = normal_exp_mat.toarray()
-t_statistics, p_values = ttest_ind(covid_gene_data, normal_gene_data, equal_var=False)
-significant_genes_value = p_values < 0.05
-significant_gene_names = gene_names.values[significant_genes_value]
-significant_t_statistics = t_statistics[significant_genes_value]
-significant_p_values = p_values[significant_genes_value]
-significant_gene_names =significant_gene_names.astype(str) #Not necessary if saving in dataframe
-output_filename = "/active/debruinz_project/gautam_subedi/t_test_results.csv"
-df = pd.DataFrame(data)
-df.to_csv(output_filename, index=False)
+# Randomly select a subset of cells
+selected_cells_indices = np.random.choice(covid_exp_mat.shape[0], size=num_cells, replace=False)
+subsampled_covid_exp_mat = covid_exp_mat[ selected_cells_indices, :]
+selected_cells_indices = np.random.choice(normal_exp_mat.shape[0], size=num_cells, replace=False)
+subsampled_noraml_exp_mat = normal_exp_mat[selected_cells_indices, :]
 
-
-# Convert pandas dataframes to R dataframes
-pandas2ri.activate()
-
-def limma_t_test(covid_exp_mat, normal_exp_mat):
-    # Convert Python pandas dataframes to R dataframes
-    covid_exp_mat_r = pandas2ri.py2ri(covid_exp_mat)
-    normal_exp_mat_r = pandas2ri.py2ri(normal_exp_mat)
-
-    # Run limma t-test
-    design_matrix = robjects.r.cbind(robjects.IntVector([1]*covid_exp_mat_r.ncol), robjects.IntVector([0]*normal_exp_mat_r.ncol))
-    fit = limma.lmFit(covid_exp_mat_r, design_matrix)
-    contrast_matrix = robjects.r.matrix(robjects.FloatVector([1, -1]), nrow=1)
-    contrast = robjects.r.contrasts.fit(fit, contrast_matrix)
-    fit_eb = limma.eBayes(contrast)
-    top_table = limma.topTable(fit_eb, coef=1, number=covid_exp_mat_r.nrow)
-    
-    # Extract results
-    results = pandas2ri.ri2py_dataframe(top_table)
-    
-    return results
-
-# Example usage:
-# Assuming you have two pandas DataFrames: covid_exp_mat and normal_exp_mat
-# results = limma_t_test(covid_exp_mat, normal_exp_mat)
-
-## We can't convert the sparse matrices into R matrces for further analysis. WHen trying to make it 
-## densa matrix and then to a exp_mat in R it doesnt load. 
-
-
-## WHY DOESN'T THIS WORK ##
-# Convert CSR matrices to dense arrays
-covid_data_dense = covid_exp_mat.toarray()
-non_covid_data_dense = normal_exp_mat.toarray()
-
-# Transfer data to R
-ro.numpy2ri.activate()  # Activate conversion between NumPy arrays and R arrays
-r_covid_data = ro.r.matrix(covid_data_dense)
-r_non_covid_data = ro.r.matrix(non_covid_data_dense)
 
 # Load limma library in R
 ro.r("library(limma)")
+ro.r("library(Matrix)")
 
-# Perform t-test using limma
-ro.r("result <- eBayes(lmFit(cbind(covid_data, non_covid_data) ~ condition))")
+# These are conversions from sparse matrices to R
+mmwrite("normal_mat_R.mtx", subsampled_noraml_exp_mat)
+mmwrite("covid_mat_R.mtx", subsampled_covid_exp_mat)
 
-sc.tl.rank_genes_groups(combined_adata, groups=['covid_exp_mat', 'normal_exp_mat'], method='ttest')  # Replace 'ttest' with desired test
+# Turning sparse matrices into the following variables in R
+ro.r("covid_data <- readMM('covid_mat_R.mtx')")
+ro.r("non_covid_data <- readMM('normal_mat_R.mtx')")
+
+# Combine data into a data frame or matrix with columns corresponding to each group
+# Assuming non_covid_data and covid_data are numeric vectors or matrices of equal length
+
+# Assuming 'combined_data' is your variable or matrix
+ro.r("covid_data <- t(covid_data)")
+ro.r("non_covid_data <- t(non_covid_data)")
+
+
+ro.r("combined_data <- cbind(non_covid_data, covid_data)")
+ro.r("combined_data <- t(combined_data)")
+
+
+ro.r("design <- cbind(NonCovid = rep(1, ncol(non_covid_data)), Covid = rep(0, ncol(covid_data)))")
+
+ro.r("fit <- lmFit(combined_data, design)")
+
+ro.r("fit <- eBayes(fit)")
+
+ro.r("results <- decideTests(fit)")
+ro.r("significant_genes <- rownames(combined_data)[results$FDR <= 0.05]")
